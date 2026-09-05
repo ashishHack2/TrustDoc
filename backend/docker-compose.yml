@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql://trustdoc:trustdoc@db:5432/trustdoc
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=trustdoc
+      - MINIO_SECRET_KEY=trustdoc123
+      - MINIO_BUCKET=trustdoc-evidence
+      - DEMO_MODE=true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+
+  worker:
+    build: .
+    command: celery -A app.workers.tasks worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql://trustdoc:trustdoc@db:5432/trustdoc
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=trustdoc
+      - MINIO_SECRET_KEY=trustdoc123
+      - MINIO_BUCKET=trustdoc-evidence
+      - DEMO_MODE=true
+    depends_on:
+      - api
+      - redis
+      - db
+      - minio
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=trustdoc
+      - POSTGRES_PASSWORD=trustdoc
+      - POSTGRES_DB=trustdoc
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustdoc -d trustdoc"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=trustdoc
+      - MINIO_ROOT_PASSWORD=trustdoc123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc config host add myminio http://minio:9000 trustdoc trustdoc123;
+      /usr/bin/mc mb myminio/trustdoc-evidence --ignore-existing;
+      /usr/bin/mc policy set public myminio/trustdoc-evidence;
+      exit 0;
+      "
+
+volumes:
+  postgres_data:
+  minio_data:

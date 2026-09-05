@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 40 20% 98%;
+    --secondary: 210 16% 95%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 16% 93%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 199 89% 48%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 199 89% 48%;
+    --radius: 0.5rem;
+
+    --td-navy: 222 47% 11%;
+    --td-cyan: 199 89% 48%;
+    --td-cyan-soft: 199 89% 95%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .font-mono-td {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", monospace;
+    font-feature-settings: "ss01";
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, hsl(215 28% 90% / 0.35) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(215 28% 90% / 0.35) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .dot-bg {
+    background-image: radial-gradient(hsl(215 28% 70% / 0.18) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .dark-grid-bg {
+    background-image:
+      linear-gradient(to right, hsl(199 50% 30% / 0.12) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(199 50% 30% / 0.12) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+}
+
+@layer base {
+  @keyframes scan-beam {
+    0% { transform: translateY(-100%); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(100%); opacity: 0; }
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+
+  @keyframes data-flow {
+    0% { stroke-dashoffset: 100; }
+    100% { stroke-dashoffset: 0; }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .animate-pulse-dot {
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+}
