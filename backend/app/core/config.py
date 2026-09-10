@@ -1,5 +1,6 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     # Database (Default to SQLite for instant local dev, PostgreSQL when configured)
@@ -28,8 +29,28 @@ class Settings(BaseSettings):
     # App Settings
     DEMO_MODE: bool = True
     MAX_UPLOAD_SIZE: int = 10485760 # 10 MB
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"]
+    CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"]
     LOG_LEVEL: str = "INFO"
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            clean = v.strip().strip('"').strip("'")
+            if not clean:
+                return ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"]
+            if clean == "*":
+                return ["*"]
+            if clean.startswith("[") and clean.endswith("]"):
+                import json
+                try:
+                    return json.loads(clean)
+                except Exception:
+                    pass
+            return [x.strip().strip('"').strip("'") for x in clean.split(",") if x.strip()]
+        elif isinstance(v, (list, tuple)):
+            return [str(x) for x in v]
+        return ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"]
 
     class Config:
         env_file = ".env"
