@@ -85,11 +85,30 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS middleware
+# Robust CORS middleware configuration
+origins = settings.CORS_ORIGINS
+if isinstance(origins, str):
+    if origins.strip() == "*":
+        allow_origins = ["*"]
+        allow_credentials = False
+    else:
+        allow_origins = [o.strip() for o in origins.split(",") if o.strip()]
+        allow_credentials = True
+elif isinstance(origins, list):
+    if "*" in origins:
+        allow_origins = ["*"]
+        allow_credentials = False
+    else:
+        allow_origins = origins
+        allow_credentials = True
+else:
+    allow_origins = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"]
+    allow_credentials = True
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -97,6 +116,16 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+
+@app.get("/", tags=["Health"])
+async def root():
+    return {
+        "status": "ok",
+        "service": "TRUSTDOC Forensics API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "redoc": "/redoc"
+    }
 
 @app.get("/health", tags=["Health"])
 async def health_check():

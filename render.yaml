@@ -1,0 +1,37 @@
+﻿services:
+  # FastAPI Backend Service
+  - type: web
+    name: trustdoc-backend
+    env: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./trustdoc.db
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: DEMO_MODE
+        value: "true"
+
+  # Next.js Frontend Service
+  - type: web
+    name: trustdoc-frontend
+    env: node
+    region: oregon
+    plan: free
+    rootDir: frontend_trust-main
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: trustdoc-backend
+          property: host
