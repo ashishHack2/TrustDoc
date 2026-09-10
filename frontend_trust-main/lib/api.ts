@@ -1,5 +1,5 @@
 // Central API client for the TRUSTDOC FastAPI backend
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://trustdoc.onrender.com';
 
 // -- Types aligned with the FastAPI backend --
 
