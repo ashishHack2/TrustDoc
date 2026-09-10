@@ -1,4 +1,4 @@
-﻿# 🚀 TRUSTDOC Production & Cloud Deployment Guide
+# 🚀 TRUSTDOC Production & Cloud Deployment Guide
 
 This guide provides complete instructions and configuration settings for deploying **TRUSTDOC** across cloud environments (Vercel, Render, Docker, Railway, AWS, and Linux VPS).
 
@@ -94,11 +94,25 @@ docker compose down
 
 ## 🌐 Deployment Method 3: Netlify (Frontend)
 
-The repository contains [`frontend_trust-main/netlify.toml`](./frontend_trust-main/netlify.toml) configured for `@netlify/plugin-nextjs`.
-1. Link repository on [Netlify](https://netlify.com/).
-2. Set **Base directory**: `frontend_trust-main`.
-3. Set environment variable: `NEXT_PUBLIC_API_URL` to your backend URL.
-4. Deploy site.
+The repository contains both a root [`netlify.toml`](./netlify.toml) and [`frontend_trust-main/netlify.toml`](./frontend_trust-main/netlify.toml) pre-configured with the official `@netlify/plugin-nextjs` and security headers.
+
+### Step-by-Step Netlify Setup:
+1. Log in to your [Netlify Dashboard](https://app.netlify.com/).
+2. Click **"Add new site"** $\rightarrow$ **"Import an existing project"**.
+3. Select **GitHub** and authorize repository: `ashishHack2/TrustDoc`.
+4. Configure Build & Deploy Settings:
+   - **Base directory**: `frontend_trust-main`
+   - **Package directory**: (leave blank)
+   - **Build command**: `npm run build`
+   - **Publish directory**: `.next`
+   - **Functions directory**: (auto-managed by `@netlify/plugin-nextjs`)
+5. Configure Environment Variables (under **"Site settings"** $\rightarrow$ **"Environment variables"**):
+   | Key | Value | Notes |
+   |---|---|---|
+   | `NEXT_PUBLIC_API_URL` | `https://trustdoc.onrender.com` | Points to your live Render backend |
+   | `NODE_VERSION` | `18` | Recommended Node.js runtime |
+6. Click **"Deploy site"**.
+7. Netlify will build the Next.js frontend, deploy serverless edge functions, and provide a live HTTPS URL (e.g., `https://trustdoc.netlify.app`).
 
 ---
 
