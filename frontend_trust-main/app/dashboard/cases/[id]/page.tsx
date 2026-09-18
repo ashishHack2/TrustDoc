@@ -8,7 +8,7 @@ import {
   AlertTriangle, Loader2, ArrowLeft, Play, Download, FileText,
   User, Hash, ChevronDown, ChevronUp, QrCode, Sparkles, Microscope, Eye
 } from 'lucide-react';
-import { getCase, triggerVerification, getVerificationResult, getCaseDocuments, getProcessingStatus } from '@/lib/api';
+import { getCase, triggerVerification, getVerificationResult, getCaseDocuments, getProcessingStatus, downloadEvidencePackage } from '@/lib/api';
 import type { Case, VerificationResult, Document, ProcessingStatus } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +23,17 @@ export default function CaseDetailPage() {
   const [triggering, setTriggering] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const handleDownloadEvidence = async () => {
+    if (!id) return;
+    setDownloading(true);
+    setDownloadError(null);
+    const { error: dlError } = await downloadEvidencePackage(id);
+    if (dlError) setDownloadError(dlError);
+    setDownloading(false);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -33,7 +44,7 @@ export default function CaseDetailPage() {
       getProcessingStatus(id),
     ]).then(([cRes, docsRes, verRes, statusRes]) => {
       if (cRes.data) setCaseData(cRes.data);
-      setDocuments(docsRes.data);
+      setDocuments(docsRes.data || []);
       if (verRes.data) setVerification(verRes.data);
       if (statusRes.data) setProcessingStatus(statusRes.data);
       setLoading(false);
@@ -214,7 +225,10 @@ export default function CaseDetailPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-td-navy truncate">{doc.file_name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {(doc.file_size / 1024).toFixed(1)} KB · {doc.document_type}
+                    {(doc.file_size / 1024).toFixed(1)} KB · {prettyDocType(doc.document_type)}
+                    {doc.document_type !== 'unknown' && doc.confidence != null && (
+                      <> · <span className="text-green-600">{doc.confidence.toFixed(0)}% match</span></>
+                    )}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -291,14 +305,31 @@ export default function CaseDetailPage() {
       {/* Report actions */}
       {verification && (
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2.5 text-sm font-medium text-td-navy hover:bg-muted/30 transition-colors">
-            <Download className="h-4 w-4" />
+          <button
+            onClick={handleDownloadEvidence}
+            disabled={downloading}
+            className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-2.5 text-sm font-medium text-td-navy hover:bg-muted/30 transition-colors disabled:opacity-60"
+          >
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             Export Evidence Package
           </button>
+          {downloadError && <span className="text-xs text-red-600 self-center">{downloadError}</span>}
         </div>
       )}
     </div>
   );
+}
+
+function prettyDocType(t: string): string {
+  const map: Record<string, string> = {
+    passport: 'Passport',
+    national_id: 'National ID',
+    driving_licence: 'Driving Licence',
+    visa: 'Visa',
+    selfie: 'Selfie Photo',
+    unknown: 'Unclassified',
+  };
+  return map[t] || t;
 }
 
 function ProcessingProgress({ status }: { status: ProcessingStatus }) {

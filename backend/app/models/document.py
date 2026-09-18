@@ -9,7 +9,17 @@ class DocumentType(str, enum.Enum):
     NATIONAL_ID = "national_id"
     DRIVING_LICENCE = "driving_licence"
     VISA = "visa"
+    SELFIE = "selfie"
     UNKNOWN = "unknown"
+
+# Plain VARCHAR storage (native_enum=False) so new enum values work on both
+# SQLite dev databases and existing PostgreSQL deployments without a migration.
+_DOCUMENT_TYPE_ENUM = Enum(
+    DocumentType,
+    values_callable=lambda e: [m.value for m in e],
+    native_enum=False,
+    length=20,
+)
 
 class Document(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "documents"
@@ -22,7 +32,7 @@ class Document(Base, UUIDMixin, TimestampMixin):
     file_hash = Column(String(64), nullable=False, index=True) # SHA-256
     storage_key = Column(String(500), nullable=False) # MinIO path
     
-    document_type = Column(Enum(DocumentType), default=DocumentType.UNKNOWN)
+    document_type = Column(_DOCUMENT_TYPE_ENUM, default=DocumentType.UNKNOWN)
     country = Column(String(50), nullable=True)
     confidence = Column(Float, nullable=True)
     

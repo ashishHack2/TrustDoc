@@ -28,8 +28,9 @@ function ReportsContent() {
 
   useEffect(() => {
     getCases().then(({ data }) => {
-      setCases(data);
-      if (!selectedId && data.length > 0) setSelectedId(data[0].id);
+      const list = data || [];
+      setCases(list);
+      if (!selectedId && list.length > 0) setSelectedId(list[0].id);
       setLoading(false);
     });
   }, []);

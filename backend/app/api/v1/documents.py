@@ -58,7 +58,19 @@ async def upload_document(
     with open(storage_key, "wb") as f:
         f.write(content)
     
-    # 4. Save to Database
+    # 4. Classify the document from real pixel data, then save to Database
+    from app.services.document_classifier import DocumentClassifier
+
+    classification = DocumentClassifier.classify(
+        file_path=storage_key, mime_type=file.content_type, file_name=file.filename
+    )
+    try:
+        classified_type = DocumentType(classification["document_type"])
+    except ValueError:
+        classified_type = DocumentType.UNKNOWN
+
+    earlier_docs = db.query(Document).filter(Document.case_id == case.id).all()
+
     document = Document(
         case_id=case.id,
         file_name=file.filename,
@@ -66,21 +78,29 @@ async def upload_document(
         file_size=file_size,
         file_hash=file_hash,
         storage_key=storage_key,
-        document_type=DocumentType.UNKNOWN
+        document_type=classified_type,
+        confidence=classification["confidence"],
     )
     db.add(document)
-    
+
     # 5. Automatically execute the multi-layer Verification Pipeline
     from app.services.verification_engine import VerificationEngine
-    from app.api.v1.verification import _VERIFICATION_CACHE
+    from app.api.v1.verification import _VERIFICATION_CACHE, case_has_selfie, primary_document
     from app.models.case import DecisionStatus
-    
+
+    # Analyze the primary document together with any earlier ones
+    # (e.g. selfie + document), so the newest upload refreshes the verdict.
+    all_docs = earlier_docs + [document]
+    primary = primary_document(all_docs)
+
     ver_res = VerificationEngine.run_pipeline(
         case_id=case.id,
         applicant_name=case.applicant_name,
         doc_type=case.expected_document_type or "Passport",
-        file_path=storage_key,
-        file_hash=file_hash
+        file_path=primary.storage_key,
+        file_hash=primary.file_hash,
+        has_selfie=case_has_selfie(all_docs),
+        classification={"document_type": classification["document_type"]},
     )
     
     case.status = CaseStatus.COMPLETED

@@ -35,10 +35,16 @@ if (-not (Test-Path $PythonExe)) {
 }
 
 if (-not (Test-Path $PythonExe)) {
-    Write-Host "ERROR: Python is not available in backend/venv. Please ensure Python 3.10+ is installed." -ForegroundColor Red
-    exit 1
+    $sysPy = (Get-Command python -ErrorAction SilentlyContinue).Source
+    if ($sysPy) {
+        $PythonExe = $sysPy
+    } else {
+        Write-Host "ERROR: Python is not available. Please ensure Python 3.10+ is installed." -ForegroundColor Red
+        exit 1
+    }
 }
-Write-Host "  -> Python virtualenv active: $PythonExe" -ForegroundColor Green
+Write-Host "  -> Python interpreter active: $PythonExe" -ForegroundColor Green
+
 
 # Check Node.js
 try {
@@ -81,7 +87,7 @@ Write-Host "`n[3/5] Verifying Frontend Dependencies..." -ForegroundColor Yellow
 if (-not (Test-Path (Join-Path $FrontendDir "node_modules"))) {
     Write-Host "  -> Running npm install in frontend (this happens only on first run)..." -ForegroundColor DarkYellow
     Push-Location $FrontendDir
-    npm install
+    cmd.exe /c npm install
     Pop-Location
 }
 Write-Host "  -> Frontend dependencies verified." -ForegroundColor Green

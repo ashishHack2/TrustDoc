@@ -18,7 +18,7 @@ export default function CasesPage() {
 
   useEffect(() => {
     getCases().then(({ data }) => {
-      setCases(data);
+      setCases(data || []);
       setLoading(false);
     });
   }, []);

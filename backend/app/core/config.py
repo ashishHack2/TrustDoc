@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10485760 # 10 MB
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"]
     LOG_LEVEL: str = "INFO"
+    OPENROUTER_API_KEY: Optional[str] = None
+    OPENROUTER_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
+
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

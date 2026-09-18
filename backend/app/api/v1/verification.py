@@ -1,11 +1,14 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+import io
+import json
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.case import Case, CaseStatus, DecisionStatus
-from app.models.document import Document
+from app.models.document import Document, DocumentType
 from app.models.user import User, RoleEnum
 from app.services.verification_engine import VerificationEngine
 
@@ -13,6 +16,19 @@ router = APIRouter()
 
 # In-memory cache of detailed verification results per case (can also be persisted in DB / Redis)
 _VERIFICATION_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def case_has_selfie(documents: List[Document]) -> bool:
+    """True if any document for the case was classified as a selfie/live photo."""
+    return any(d.document_type == DocumentType.SELFIE for d in documents)
+
+
+def primary_document(documents: List[Document]) -> Optional[Document]:
+    """The main identity document — first non-selfie upload, else the first file."""
+    for d in documents:
+        if d.document_type != DocumentType.SELFIE:
+            return d
+    return documents[0] if documents else None
 
 @router.post("/cases/{case_id}/process")
 def trigger_case_verification(
@@ -29,7 +45,7 @@ def trigger_case_verification(
         raise HTTPException(status_code=404, detail="Case not found")
 
     docs = db.query(Document).filter(Document.case_id == case_id).all()
-    first_doc = docs[0] if docs else None
+    first_doc = primary_document(docs)
     
     # Run the Verification Pipeline
     result = VerificationEngine.run_pipeline(
@@ -37,7 +53,8 @@ def trigger_case_verification(
         applicant_name=case.applicant_name,
         doc_type=case.expected_document_type or "Passport",
         file_path=first_doc.storage_key if first_doc else None,
-        file_hash=first_doc.file_hash if first_doc else None
+        file_hash=first_doc.file_hash if first_doc else None,
+        has_selfie=case_has_selfie(docs),
     )
     
     # Update Case in Database
@@ -86,13 +103,14 @@ def get_case_processing_status(
     elif case.status == CaseStatus.PROCESSING:
         # Finalize the processing so pipeline completes to 100%
         docs = db.query(Document).filter(Document.case_id == case_id).all()
-        first_doc = docs[0] if docs else None
+        first_doc = primary_document(docs)
         res = VerificationEngine.run_pipeline(
             case_id=case.id,
             applicant_name=case.applicant_name,
             doc_type=case.expected_document_type or "Passport",
             file_path=first_doc.storage_key if first_doc else None,
-            file_hash=first_doc.file_hash if first_doc else None
+            file_hash=first_doc.file_hash if first_doc else None,
+            has_selfie=case_has_selfie(docs),
         )
         case.status = CaseStatus.COMPLETED
         case.trust_score = res["trust_score"]
@@ -150,13 +168,14 @@ def get_case_verification(
 
     # Auto-synthesize & finalize verification report
     docs = db.query(Document).filter(Document.case_id == case_id).all()
-    first_doc = docs[0] if docs else None
+    first_doc = primary_document(docs)
     res = VerificationEngine.run_pipeline(
         case_id=case.id,
         applicant_name=case.applicant_name,
         doc_type=case.expected_document_type or "Passport",
         file_path=first_doc.storage_key if first_doc else None,
-        file_hash=first_doc.file_hash if first_doc else None
+        file_hash=first_doc.file_hash if first_doc else None,
+        has_selfie=case_has_selfie(docs),
     )
     res["id"] = str(uuid.uuid4())
     
@@ -236,3 +255,101 @@ def get_case_report(
         "summary": f"Official TrustDoc Forensic Verification Report for {case.applicant_name}. Trust score: {case.trust_score or 'N/A'}.",
         "created_at": case.created_at.isoformat() if case.created_at else datetime.utcnow().isoformat() + "Z"
     }
+
+
+@router.get("/cases/{case_id}/report/download")
+def download_case_report(
+    case_id: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> StreamingResponse:
+    """
+    Download the full evidence package for a case as a self-contained JSON
+    file: case metadata, uploaded documents (with classification), every
+    verification signal, decision reasons and the Merkle anchor.
+    """
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    documents = db.query(Document).filter(Document.case_id == case_id).all()
+    result = get_case_verification(case_id, db, current_user)
+
+    payload = {
+        "report_id": f"REP-{case_id[:8].upper()}",
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "case": {
+            "id": case.id,
+            "applicant_name": case.applicant_name,
+            "reference_number": case.reference_number,
+            "expected_document_type": case.expected_document_type,
+            "status": case.status.value,
+            "trust_score": case.trust_score,
+            "risk_level": case.risk_level,
+            "final_decision": case.final_decision.value if case.final_decision else None,
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+        },
+        "documents": [
+            {
+                "id": d.id,
+                "file_name": d.file_name,
+                "mime_type": d.mime_type,
+                "file_size": d.file_size,
+                "sha256": d.file_hash,
+                "document_type": d.document_type.value if hasattr(d.document_type, "value") else str(d.document_type),
+                "classification_confidence": d.confidence,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+            }
+            for d in documents
+        ],
+        "verification": result,
+    }
+
+    buf = io.BytesIO(json.dumps(payload, indent=2).encode("utf-8"))
+    filename = f"TRUSTDOC_Evidence_{(case.reference_number or case_id[:8]).replace('/', '-')}.json"
+    return StreamingResponse(
+        buf,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/forensic/inspect")
+async def forensic_inspect_upload(
+    file: UploadFile = File(...),
+    selfie: Optional[UploadFile] = File(None),
+    applicant_name: Optional[str] = "Applicant",
+    doc_type: Optional[str] = "Passport",
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Direct endpoint for deep digital forensic tampering inspection.
+    Accepts any document file (and optional live selfie) and performs immediate
+    Error Level Analysis (ELA), edge gradient variance, ICAO 9303 checksum checks,
+    and returns an ELA heatmap base64 data URL + tamper pinpoints.
+    """
+    from PIL import Image
+
+    doc_bytes = await file.read()
+    try:
+        doc_img = Image.open(io.BytesIO(doc_bytes)).convert("RGB")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Unable to decode document image for forensic inspection.")
+
+    selfie_img = None
+    if selfie is not None:
+        try:
+            selfie_bytes = await selfie.read()
+            selfie_img = Image.open(io.BytesIO(selfie_bytes)).convert("RGB")
+        except Exception:
+            selfie_img = None
+
+    result = VerificationEngine.inspect_forensics(
+        img=doc_img,
+        applicant_name=applicant_name or "Applicant",
+        doc_type=doc_type or "Passport",
+        selfie_img=selfie_img,
+    )
+    result["file_name"] = file.filename
+    return result
+
