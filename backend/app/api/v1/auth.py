@@ -90,6 +90,51 @@ async def login_access_token(
         "role": user.role
     }
 
+@router.post("/register", response_model=Token)
+@router.post("/signup", response_model=Token)
+def register_user(
+    user_in: UserCreate,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Register a new user (Operator, Reviewer, Auditor) and return active session tokens.
+    """
+    email_clean = str(user_in.email).strip().lower()
+    user = db.query(User).filter(User.email == email_clean).first()
+    if user:
+        raise HTTPException(
+            status_code=400,
+            detail="An account with this email address already exists. Please sign in instead.",
+        )
+    
+    # Assign specified role or default to OPERATOR
+    assigned_role = user_in.role if user_in.role else RoleEnum.OPERATOR
+
+    user = User(
+        email=email_clean,
+        hashed_password=security.get_password_hash(user_in.password),
+        full_name=user_in.full_name or "Verification Officer",
+        role=assigned_role,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    return {
+        "access_token": security.create_access_token(
+            user.id, user.role.value, expires_delta=access_token_expires
+        ),
+        "refresh_token": security.create_refresh_token(
+            user.id, user.role.value, expires_delta=refresh_token_expires
+        ),
+        "token_type": "bearer",
+        "role": user.role
+    }
+
 @router.post("/setup-admin", response_model=UserResponse)
 def create_admin(
     user_in: UserCreate,
@@ -111,3 +156,4 @@ def create_admin(
     db.commit()
     db.refresh(user)
     return user
+

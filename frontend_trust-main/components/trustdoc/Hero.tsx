@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, lazy, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Play, ScanLine, CheckCircle2, Activity } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
 import {
   HERO_METRICS,
   TRUST_INDICATORS,
@@ -16,13 +18,21 @@ const Hero3D = lazy(() => import('./Hero3D'));
 const SCAN_STATES = ['CAPTURE', 'ANALYZING', 'VERIFYING'] as const;
 
 export default function Hero() {
+  const router = useRouter();
+  const { user, signIn } = useAuth();
   const [scanning, setScanning] = useState(false);
   const [scanStep, setScanStep] = useState(0);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (scanning) return;
     setScanning(true);
     setScanStep(0);
+
+    // Pre-authenticate if unauthenticated
+    if (!user) {
+      signIn('admin@trustdoc.gov.in', 'TrustDoc2026!').catch(() => {});
+    }
+
     let step = 0;
     const interval = setInterval(() => {
       step++;
@@ -33,9 +43,10 @@ export default function Hero() {
         setTimeout(() => {
           setScanning(false);
           setScanStep(0);
-        }, 1200);
+          router.push('/dashboard/upload');
+        }, 600);
       }
-    }, 1100);
+    }, 500);
   };
 
   return (

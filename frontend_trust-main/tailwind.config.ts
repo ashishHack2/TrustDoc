@@ -20,8 +20,8 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
-        mono: ['ui-monospace', 'SF Mono', 'Cascadia Code', 'JetBrains Mono', 'monospace'],
+        sans: ['var(--font-sans)', 'var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'JetBrains Mono', 'ui-monospace', 'SF Mono', 'Cascadia Code', 'monospace'],
       },
       colors: {
         background: 'hsl(var(--background))',

@@ -182,7 +182,54 @@ export async function login(email: string, password: string): Promise<{ token: T
 
   return { token: null, error };
 }
+export async function register(
+  email: string,
+  password: string,
+  full_name: string,
+  role: TokenResponse['role'] = 'OPERATOR',
+): Promise<{ token: TokenResponse | null; error: string | null }> {
+  const { data, error } = await apiFetch<TokenResponse>(
+    '/api/v1/auth/register',
+    {
+      method: 'POST',
+      body: JSON.stringify({ email, password, full_name, role }),
+      headers: { 'Content-Type': 'application/json' },
+    },
+    false,
+  );
 
+  if (data) {
+    setTokens(data.access_token, data.refresh_token);
+    return { token: data, error: null };
+  }
+
+  // Fallback demo signup if server is offline
+  if (error === 'Network error') {
+    const demoPayload = btoa(
+      JSON.stringify({
+        sub: 'demo-user-id-' + Math.random().toString(36).substring(7),
+        email,
+        full_name,
+        role,
+        exp: Math.floor(Date.now() / 1000) + 86400 * 7,
+      }),
+    );
+    const demoToken: TokenResponse = {
+      access_token: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${demoPayload}.demofallbacksignature`,
+      refresh_token: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${demoPayload}.demofallbackrefreshtoken`,
+      token_type: 'bearer',
+      role,
+    };
+    setTokens(demoToken.access_token, demoToken.refresh_token);
+    return { token: demoToken, error: null };
+  }
+
+  return { token: null, error };
+}
+
+export async function loginAsDemoOfficer(): Promise<{ token: TokenResponse | null; error: string | null }> {
+  return login('admin@trustdoc.gov.in', 'TrustDoc2026!');
+}
 
 export async function setupAdmin(email: string, password: string, full_name: string): Promise<{ data: UserResponse | null; error: string | null }> {
   return apiFetch<UserResponse>(

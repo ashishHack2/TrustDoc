@@ -87,17 +87,36 @@ export default function Navbar() {
               </button>
 
               <a
-                href="/auth"
-                className="text-[13px] font-medium text-foreground/70 hover:text-td-navy transition-colors px-2 py-1.5"
+                href="/dashboard/live-cam"
+                className="hidden lg:flex items-center gap-1.5 rounded-lg border border-td-cyan/40 bg-td-cyan-soft/30 px-3 py-1.5 text-[12px] font-semibold text-td-navy hover:bg-td-cyan/20 transition-all shadow-sm"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-600" />
+                </span>
+                Live Scanner
+              </a>
+
+              <a
+                href="/auth?tab=signin"
+                className="text-[13px] font-medium text-foreground/75 hover:text-td-navy transition-colors px-2 py-1.5"
               >
                 Sign In
               </a>
+
+              <a
+                href="/auth?tab=signup"
+                className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 text-[13px] font-semibold text-td-navy hover:border-td-cyan hover:bg-td-cyan-soft/20 transition-all shadow-sm"
+              >
+                Sign Up
+              </a>
+
               <a
                 href="/auth"
-                className="group inline-flex items-center gap-1.5 rounded-lg bg-td-navy px-4 py-2 text-[13px] font-semibold text-white hover:bg-td-navy/90 transition-all shadow-sm shadow-td-navy/20"
+                className="group inline-flex items-center gap-1.5 rounded-lg bg-td-navy px-3.5 py-1.5 text-[13px] font-semibold text-white hover:bg-td-navy/90 transition-all shadow-sm shadow-td-navy/20"
               >
-                Launch Verification
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                Launch App
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 text-td-cyan" />
               </a>
             </div>
 
